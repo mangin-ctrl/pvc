@@ -12,6 +12,7 @@
     "vite": "^8.2.2"
   },
   "dependencies": {
-    "bootstrap": "^5.3.8"
+    "bootstrap": "^5.3.8",
+    "peerjs": "^1.5.5"
   }
 }

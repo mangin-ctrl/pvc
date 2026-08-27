@@ -1,0 +1,91 @@
+<!doctype html>
+    <html lang="en">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <meta name="viewport" content="width=device-width,
+                 initial-scale=1.0,
+                 viewport-fit=cover">
+
+        <title>Ana</title>
+
+    </head>
+
+    <body>
+
+        <main class="call-screen">
+
+            <video id="remoteVideo" class="remote-video" autoplay playsinline>
+            </video>
+
+
+            <div id="remotePlaceholder" class="remote-placeholder">
+
+                <div class="placeholder-icon">
+                    ◉
+                </div>
+
+                <div>
+                    Waiting for connection.
+                </div>
+
+            </div>
+
+            <!-- Subtitle -->
+            <div class="subtitle">
+
+                <span class="subtitle-text">
+                    Olá, como você está?
+                </span>
+
+            </div>
+
+            <div class="local-video">
+
+                <video id="localVideo" autoplay playsinline muted>
+                </video>
+
+            </div>
+
+
+            <div class="person-label">
+                Ana
+            </div>
+            
+
+
+            <div id="status" class="status">
+
+                Starting...
+
+            </div>
+
+
+            <div class="controls">
+
+                <button id="callButton" class="control-button">
+
+                    📞
+
+                </button>
+
+
+                <button id="hangupButton" class="control-button end-call">
+
+                    ☎
+
+                </button>
+
+            </div>
+
+        </main>
+
+
+        <script type="module" src="/src/person.js">
+        </script>
+
+    </body>
+
+    </html>
