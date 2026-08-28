@@ -184,7 +184,10 @@ function callPerson() {
     handleCall(
         call
     );
-
+    console.log("Start Recognition");
+    startRecognition();
+    console.log("Recognition started");
+    
 }
 
 function handleCall(call) {
@@ -300,6 +303,8 @@ function initSpeechRecognition() {
         }
 
         const currentText = finalText || interimText;
+
+        console.log("Current Subtitle Text: ", currentText);
 
         if (dataConnection && dataConnection.open && currentText) {
             dataConnection.send({ type: 'subtitle', text: currentText });
