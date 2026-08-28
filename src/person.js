@@ -61,6 +61,12 @@ let dataConnection = null;
 
 let recognition = null;
 
+let recognitionRunning = false;
+let recognitionShouldRun = false;
+let recognitionRestartTimer = null;
+
+let endingCall = false;
+
 async function startCamera() {
 
     try {
@@ -184,9 +190,6 @@ function callPerson() {
     handleCall(
         call
     );
-    console.log("Start Recognition");
-    startRecognition();
-    console.log("Recognition started");
     
 }
 
@@ -194,34 +197,39 @@ function handleCall(call) {
 
     console.log("Handling call:", call);
 
-    if (!recognition) {
-        initSpeechRecognition();
-    }
-
     call.on("stream", (remoteStream) => {
+
         console.log("🎥 REMOTE STREAM RECEIVED");
         console.log("Remote stream:", remoteStream);
+
         remoteVideo.srcObject = remoteStream;
+
         remotePlaceholder.style.display = "none";
+
         setStatus("Connected");
-        if (!recognition) {
-            initSpeechRecognition();
-        }
+
+        // Start recognition ONLY after the video connection
+        // is actually established.
         startRecognition();
     });
 
     call.on("close", () => {
 
-        console.log("Call closed");
-        endCall();
-        stopRecognition();
+        console.log("📞 Call closed");
+
+        // Do NOT call currentCall.close() again here.
+        cleanupCall(false);
+
         setStatus("Call ended");
     });
 
     call.on("error", (error) => {
+
         console.error("❌ CALL ERROR:", error);
+
+        cleanupCall(false);
+
         setStatus("Call error");
-        endCall();
     });
 }
 
@@ -246,23 +254,63 @@ hangupButton.addEventListener(
 );
 
 function endCall() {
-    stopRecognition();
+    cleanupCall(true);
+}
 
-    if (currentCall) {
-        currentCall.close();
-        currentCall = null;
+function cleanupCall(closeCall) {
+
+    if (endingCall) {
+        return;
     }
 
-    if (dataConnection) {
-        dataConnection.close();
-        dataConnection = null;
+    endingCall = true;
+
+    // Stop recognition and prevent automatic restart.
+    stopRecognition();
+
+    // Save references before clearing them.
+    const call = currentCall;
+    currentCall = null;
+
+    // Only close the call when WE initiated the hangup.
+    // If PeerJS already fired "close", don't close it again.
+    if (closeCall && call) {
+        try {
+            call.close();
+        } catch (error) {
+            console.warn(
+                "Call was already closed:",
+                error
+            );
+        }
+    }
+
+    const connection = dataConnection;
+    dataConnection = null;
+
+    if (connection) {
+        try {
+            connection.close();
+        } catch (error) {
+            console.warn(
+                "Data connection was already closed:",
+                error
+            );
+        }
     }
 
     remoteVideo.srcObject = null;
+
     remotePlaceholder.style.display = "flex";
 
     showSubtitle("");
+
     setStatus("Call ended");
+
+    // Allow another call to start cleanly.
+    setTimeout(() => {
+        endingCall = false;
+    }, 0);
 }
 
 startCamera();
@@ -280,57 +328,282 @@ function showSubtitle(
 }
 
 function initSpeechRecognition() {
-    const SpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    const SpeechAPI =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
 
     if (!SpeechAPI) {
-        showSubtitle("Speech API not supported in this browser.");
-        return;
+
+        console.warn(
+            "Speech Recognition API is not supported."
+        );
+
+        showSubtitle(
+            "Speech API not supported in this browser."
+        );
+
+        return false;
+    }
+
+    // Only create ONE recognition object.
+    if (recognition) {
+        return true;
     }
 
     recognition = new SpeechAPI();
+
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = isNick ? 'en-US' : 'pt-BR';
+
+    recognition.lang =
+        isNick
+            ? 'en-US'
+            : 'pt-BR';
+
+
+    recognition.onstart = () => {
+
+        recognitionRunning = true;
+
+        console.log(
+            "🎤 Speech recognition started"
+        );
+    };
+
 
     recognition.onresult = event => {
+
         let interimText = '';
         let finalText = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (
+            let i = event.resultIndex;
+            i < event.results.length;
+            ++i
+        ) {
 
-            // Accessing index 0 of the alternative array inside the results array
-            const alternative = event.results[i][0];
+            const alternative =
+                event.results[i][0];
 
-            if (event.results[i].isFinal) {
-                finalText += alternative.transcript;
+            if (
+                event.results[i].isFinal
+            ) {
+
+                finalText +=
+                    alternative.transcript;
+
             } else {
-                interimText += alternative.transcript;
+
+                interimText +=
+                    alternative.transcript;
             }
         }
 
-        const currentText = finalText || interimText;
+        const currentText =
+            finalText || interimText;
 
-        console.log("Current Subtitle Text: ", currentText);
+        console.log(
+            "Current Subtitle Text:",
+            currentText
+        );
 
-        if (dataConnection && dataConnection.open && currentText) {
-            dataConnection.send({ type: 'subtitle', text: currentText });
+
+        // Only send when the data channel
+        // is actually open.
+        if (
+            dataConnection &&
+            dataConnection.open &&
+            currentText
+        ) {
+
+            try {
+
+                dataConnection.send({
+                    type: 'subtitle',
+                    text: currentText
+                });
+
+            } catch (error) {
+
+                console.warn(
+                    "Unable to send subtitle:",
+                    error
+                );
+            }
         }
     };
 
-    recognition.onerror = e => console.error("Speech Error: ", e);
+
+    recognition.onerror = event => {
+
+        console.warn(
+            "🎤 Speech recognition error:",
+            event.error
+        );
+
+        recognitionRunning = false;
+
+        // These errors mean the browser has
+        // denied/blocked speech recognition.
+        if (
+            event.error === 'not-allowed' ||
+            event.error === 'service-not-allowed'
+        ) {
+
+            recognitionShouldRun = false;
+
+            showSubtitle(
+                "Microphone permission is required for subtitles."
+            );
+        }
+    };
+
+
+    recognition.onend = () => {
+
+        recognitionRunning = false;
+
+        console.log(
+            "🎤 Speech recognition ended. Restart:",
+            recognitionShouldRun
+        );
+
+        // If the call has ended, DO NOT restart.
+        if (!recognitionShouldRun) {
+            return;
+        }
+
+        clearTimeout(
+            recognitionRestartTimer
+        );
+
+        // Chrome frequently ends SpeechRecognition
+        // even when continuous=true.
+        //
+        // Wait briefly before restarting.
+        recognitionRestartTimer =
+            setTimeout(() => {
+
+                recognitionRestartTimer = null;
+
+                startRecognition();
+
+            }, 250);
+    };
+
+
+    return true;
 }
 
 function startRecognition() {
-    if (recognition) {
+
+    recognitionShouldRun = true;
+
+    if (!initSpeechRecognition()) {
+        return;
+    }
+
+    // Already running — do nothing.
+    if (recognitionRunning) {
+
+        console.log(
+            "🎤 Recognition already running"
+        );
+
+        return;
+    }
+
+    try {
+
         recognition.start();
+
+    } catch (error) {
+
+        // Chrome throws this if start() is called
+        // while recognition is already starting/running.
+        if (
+            error.name ===
+            'InvalidStateError'
+        ) {
+
+            console.log(
+                "🎤 Recognition is already starting/running."
+            );
+
+            return;
+        }
+
+        console.error(
+            "❌ Unable to start speech recognition:",
+            error
+        );
+
+        clearTimeout(
+            recognitionRestartTimer
+        );
+
+        recognitionRestartTimer =
+            setTimeout(() => {
+
+                recognitionRestartTimer = null;
+
+                if (
+                    recognitionShouldRun &&
+                    !recognitionRunning
+                ) {
+
+                    startRecognition();
+                }
+
+            }, 500);
     }
 }
 
 function stopRecognition() {
-    if (recognition) {
-        recognition.stop();
-        recognition = null;
+
+    // Tell onend NOT to restart recognition.
+    recognitionShouldRun = false;
+
+    clearTimeout(
+        recognitionRestartTimer
+    );
+
+    recognitionRestartTimer = null;
+
+
+    if (!recognition) {
+
+        recognitionRunning = false;
+
+        return;
     }
+
+
+    try {
+
+        recognition.stop();
+
+    } catch (error) {
+
+        if (
+            error.name !==
+            'InvalidStateError'
+        ) {
+
+            console.warn(
+                "Speech recognition stop warning:",
+                error
+            );
+        }
+    }
+
+    recognitionRunning = false;
+
+    // IMPORTANT:
+    // Do NOT destroy the recognition object.
+    //
+    // It can be reused on the next call.
 }
 
 // 🚀 Native Integration Layer with Google Cloud Translate API
