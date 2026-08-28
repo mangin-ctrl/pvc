@@ -194,12 +194,19 @@ function handleCall(call) {
 
     console.log("Handling call:", call);
 
+    if (!recognition) {
+        initSpeechRecognition();
+    }
+
     call.on("stream", (remoteStream) => {
         console.log("🎥 REMOTE STREAM RECEIVED");
         console.log("Remote stream:", remoteStream);
         remoteVideo.srcObject = remoteStream;
         remotePlaceholder.style.display = "none";
         setStatus("Connected");
+        if (!recognition) {
+            initSpeechRecognition();
+        }
         startRecognition();
     });
 
@@ -207,6 +214,7 @@ function handleCall(call) {
 
         console.log("Call closed");
         endCall();
+        stopRecognition();
         setStatus("Call ended");
     });
 
@@ -258,8 +266,6 @@ function endCall() {
 }
 
 startCamera();
-initSpeechRecognition();
-
 
 function showSubtitle(
     text
@@ -323,6 +329,7 @@ function startRecognition() {
 function stopRecognition() {
     if (recognition) {
         recognition.stop();
+        recognition = null;
     }
 }
 
