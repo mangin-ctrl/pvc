@@ -64,6 +64,19 @@ let recognition = null;
 let recognitionRunning = false;
 let recognitionShouldRun = false;
 let recognitionRestartTimer = null;
+// Final speech waiting to be sent
+let subtitleBuffer = '';
+
+// Timer used to detect a natural pause
+let subtitlePauseTimer = null;
+
+// How long the speaker must pause before sending
+const SUBTITLE_PAUSE_MS = 700;
+
+// Safety limit so a long sentence is eventually sent
+const SUBTITLE_MAX_WAIT_MS = 3000;
+
+let subtitleMaxWaitTimer = null;
 
 let endingCall = false;
 
@@ -190,7 +203,7 @@ function callPerson() {
     handleCall(
         call
     );
-    
+
 }
 
 function handleCall(call) {
@@ -374,66 +387,34 @@ function initSpeechRecognition() {
 
     recognition.onresult = event => {
 
-        let interimText = '';
-        let finalText = '';
-
         for (
             let i = event.resultIndex;
             i < event.results.length;
             ++i
         ) {
 
-            const alternative =
-                event.results[i][0];
+            const result = event.results[i];
 
-            if (
-                event.results[i].isFinal
-            ) {
-
-                finalText +=
-                    alternative.transcript;
-
-            } else {
-
-                interimText +=
-                    alternative.transcript;
+            // Ignore interim recognition completely.
+            if (!result.isFinal) {
+                continue;
             }
-        }
 
-        const currentText =
-            finalText || interimText;
+            const finalText =
+                result[0].transcript.trim();
 
-        console.log(
-            "Current Subtitle Text:",
-            currentText
-        );
-
-
-        // Only send when the data channel
-        // is actually open.
-        if (
-            dataConnection &&
-            dataConnection.open &&
-            currentText
-        ) {
-
-            try {
-
-                dataConnection.send({
-                    type: 'subtitle',
-                    text: currentText
-                });
-
-            } catch (error) {
-
-                console.warn(
-                    "Unable to send subtitle:",
-                    error
-                );
+            if (!finalText) {
+                continue;
             }
+
+            console.log(
+                "🎤 FINAL SPEECH:",
+                finalText
+            );
+
+            addFinalSpeech(finalText);
         }
     };
-
 
     recognition.onerror = event => {
 
@@ -464,12 +445,18 @@ function initSpeechRecognition() {
 
         recognitionRunning = false;
 
+
+        // Never lose final speech that is
+        // waiting in the subtitle buffer.
+        flushSubtitleBuffer();
+
+
         console.log(
             "🎤 Speech recognition ended. Restart:",
             recognitionShouldRun
         );
 
-        // If the call has ended, DO NOT restart.
+        // If the call has ended, do not restart.
         if (!recognitionShouldRun) {
             return;
         }
@@ -478,10 +465,6 @@ function initSpeechRecognition() {
             recognitionRestartTimer
         );
 
-        // Chrome frequently ends SpeechRecognition
-        // even when continuous=true.
-        //
-        // Wait briefly before restarting.
         recognitionRestartTimer =
             setTimeout(() => {
 
@@ -492,9 +475,125 @@ function initSpeechRecognition() {
             }, 250);
     };
 
-
     return true;
 }
+
+function addFinalSpeech(text) {
+
+    // Add the new final recognition result
+    // to anything already waiting.
+    subtitleBuffer =
+        subtitleBuffer
+            ? `${subtitleBuffer} ${text}`
+            : text;
+
+    console.log(
+        "📝 Subtitle buffer:",
+        subtitleBuffer
+    );
+
+
+    // Every new piece of speech means the
+    // speaker is probably still talking.
+    //
+    // Reset the short pause timer.
+    clearTimeout(
+        subtitlePauseTimer
+    );
+
+
+    subtitlePauseTimer =
+        setTimeout(() => {
+
+            flushSubtitleBuffer();
+
+        }, SUBTITLE_PAUSE_MS);
+
+
+    // Start a maximum-wait timer the first
+    // time text enters the buffer.
+    if (!subtitleMaxWaitTimer) {
+
+        subtitleMaxWaitTimer =
+            setTimeout(() => {
+
+                flushSubtitleBuffer();
+
+            }, SUBTITLE_MAX_WAIT_MS);
+    }
+}
+
+function flushSubtitleBuffer() {
+
+    clearTimeout(
+        subtitlePauseTimer
+    );
+
+    subtitlePauseTimer = null;
+
+
+    clearTimeout(
+        subtitleMaxWaitTimer
+    );
+
+    subtitleMaxWaitTimer = null;
+
+
+    const text =
+        subtitleBuffer.trim();
+
+
+    // Empty buffer — nothing to send.
+    if (!text) {
+
+        subtitleBuffer = '';
+
+        return;
+    }
+
+
+    // Clear the buffer BEFORE sending.
+    subtitleBuffer = '';
+
+
+    console.log(
+        "📤 SENDING COMPLETE PHRASE:",
+        text
+    );
+
+
+    if (
+        dataConnection &&
+        dataConnection.open
+    ) {
+
+        try {
+
+            dataConnection.send({
+
+                type: 'subtitle',
+
+                text: text
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "❌ Failed to send subtitle:",
+                error
+            );
+        }
+
+    } else {
+
+        console.warn(
+            "⚠️ Data connection not open. Subtitle discarded:",
+            text
+        );
+    }
+}
+
 
 function startRecognition() {
 
@@ -608,22 +707,32 @@ function stopRecognition() {
 
 // 🚀 Native Integration Layer with Google Cloud Translate API
 async function processAndDisplayRemoteSubtitle(rawText) {
-    const targetLang = isNick ? 'en' : 'pt';
-    const apiKey = "API KEY"
 
-    // If no API Key is entered, display raw text as fallback
-    if (!apiKey) {
-        setSubtitleText(`[No API Key - Raw Text]: ${rawText}`);
+    const targetLang = isNick ? 'en' : 'pt';
+
+    const apiKey = "AIzaSyA4qdGW5ZTjSyZChrg2gle36Fs_avBEDIg";
+
+
+    if (!rawText || !rawText.trim()) {
         return;
     }
 
+
     try {
-        // Fetch to Google Cloud Translation REST API endpoint (v2 basic)
-        const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
+
+        const url =
+            'https://translation.googleapis.com/language/translate/v2';
+
 
         const response = await fetch(url, {
+
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Goog-Api-Key': apiKey
+            },
+
             body: JSON.stringify({
                 q: rawText,
                 target: targetLang,
@@ -632,18 +741,35 @@ async function processAndDisplayRemoteSubtitle(rawText) {
         });
 
         if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText}`);
+            const errorText =
+                await response.text();
+
+            throw new Error(
+                `Translation API ${response.status}: ${errorText}`
+            );
         }
 
-        const data = await response.json();
-        const translatedText = data.data.translations[0].translatedText;
+        const data =
+            await response.json();
 
-        // Print translated text on remote block
-        setSubtitleText(translatedText);
+        const translatedText =
+            data.data.translations[0].translatedText;
+
+
+        setSubtitleText(
+            translatedText
+        );
 
     } catch (error) {
-        console.error("Translation Pipeline Failed:", error);
-        setSubtitleText(`[Translation Error]: ${rawText}`);
+
+        console.error(
+            "Translation Pipeline Failed:",
+            error
+        );
+
+        setSubtitleText(
+            rawText
+        );
     }
 }
 
@@ -742,13 +868,15 @@ function setupDataConnection(
     );
 }
 
-function handleData(data) {
+async function handleData(data) {
 
     if (!data) {
         return;
     }
 
     if (data.type === 'subtitle') {
-        showSubtitle(data.text);
+        await processAndDisplayRemoteSubtitle(
+            data.text
+        );
     }
 }
