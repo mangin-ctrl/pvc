@@ -756,7 +756,7 @@ async function processAndDisplayRemoteSubtitle(rawText) {
             data.data.translations[0].translatedText;
 
 
-        setSubtitleText(
+        showSubtitle(
             translatedText
         );
 
@@ -767,7 +767,7 @@ async function processAndDisplayRemoteSubtitle(rawText) {
             error
         );
 
-        setSubtitleText(
+        showSubtitle(
             rawText
         );
     }
