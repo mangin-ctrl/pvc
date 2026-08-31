@@ -397,9 +397,21 @@ function cleanupCall(closeCall) {
             '.subtitle-text'
         );
 
+    const cntElement =
+        document.querySelector(
+            '.subtitle'
+        );
+
+
     if (textElement) {
 
         textElement.classList.add(
+            'subtitle-hidden'
+        );
+    }
+    
+    if (cntElement) {
+        cntElement.classList.add(
             'subtitle-hidden'
         );
     }
@@ -413,6 +425,11 @@ function showSubtitle(text) {
     const textElement =
         document.querySelector(
             '.subtitle-text'
+        );
+
+    const cntElement =
+        document.querySelector(
+            '.subtitle'
         );
 
 
@@ -437,12 +454,20 @@ function showSubtitle(text) {
         'subtitle-hidden'
     );
 
+    cntElement.classList.remove(
+        'subtitle-hidden'
+    );
+
 
     // Start a fresh timer.
     subtitleHideTimer =
         setTimeout(() => {
 
             textElement.classList.add(
+                'subtitle-hidden'
+            );
+
+            cntElement.classList.add(
                 'subtitle-hidden'
             );
 
