@@ -78,6 +78,15 @@ const SUBTITLE_MAX_WAIT_MS = 3000;
 
 let subtitleMaxWaitTimer = null;
 
+// UI AUTO-HIDE
+let uiHideTimer = null;
+const UI_HIDE_DELAY = 4000;
+
+// SUBTITLE AUTO-HIDE
+let subtitleHideTimer = null;
+const SUBTITLE_DISPLAY_TIME = 5000;
+
+
 let endingCall = false;
 
 async function startCamera() {
@@ -125,6 +134,58 @@ function setStatus(
     status.textContent =
         message;
 }
+
+function showControls() {
+
+    document.body.classList.remove(
+        'ui-hidden'
+    );
+
+    resetUIHideTimer();
+}
+
+
+function hideControls() {
+
+    document.body.classList.add(
+        'ui-hidden'
+    );
+}
+
+
+function resetUIHideTimer() {
+
+    clearTimeout(
+        uiHideTimer
+    );
+
+    uiHideTimer = setTimeout(() => {
+
+        hideControls();
+
+    }, UI_HIDE_DELAY);
+}
+
+document.addEventListener(
+    'click',
+    () => {
+
+        showControls();
+
+    }
+);
+
+document.addEventListener(
+    'touchstart',
+    () => {
+
+        showControls();
+
+    },
+    {
+        passive: true
+    }
+);
 
 peer.on(
     'open',
@@ -324,20 +385,68 @@ function cleanupCall(closeCall) {
     setTimeout(() => {
         endingCall = false;
     }, 0);
-}
 
-startCamera();
+    clearTimeout(
+        subtitleHideTimer
+    );
 
-function showSubtitle(
-    text
-) {
+    subtitleHideTimer = null;
 
     const textElement =
         document.querySelector(
             '.subtitle-text'
         );
 
-    textElement.textContent = text;
+    if (textElement) {
+
+        textElement.classList.add(
+            'subtitle-hidden'
+        );
+    }
+}
+
+startCamera();
+resetUIHideTimer();
+
+function showSubtitle(text) {
+
+    const textElement =
+        document.querySelector(
+            '.subtitle-text'
+        );
+
+
+    if (!textElement) {
+        return;
+    }
+
+
+    // Cancel the previous hide timer.
+    clearTimeout(
+        subtitleHideTimer
+    );
+
+
+    // Set new subtitle.
+    textElement.textContent =
+        text;
+
+
+    // Make subtitle visible.
+    textElement.classList.remove(
+        'subtitle-hidden'
+    );
+
+
+    // Start a fresh timer.
+    subtitleHideTimer =
+        setTimeout(() => {
+
+            textElement.classList.add(
+                'subtitle-hidden'
+            );
+
+        }, SUBTITLE_DISPLAY_TIME);
 }
 
 function initSpeechRecognition() {

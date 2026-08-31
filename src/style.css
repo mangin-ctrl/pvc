@@ -72,12 +72,10 @@ body {
 
     background: #111;
 
-    color: rgba(
-        255,
-        255,
-        255,
-        .8
-    );
+    color: rgba(255,
+            255,
+            255,
+            .8);
 
     text-align: center;
 }
@@ -94,12 +92,8 @@ body {
     position: absolute;
 
     top:
-        max(
-            20px,
-            env(
-                safe-area-inset-top
-            )
-        );
+        max(20px,
+            env(safe-area-inset-top));
 
     right: 20px;
 
@@ -114,24 +108,18 @@ body {
     border-radius: 20px;
 
     border:
-        1px solid
-        rgba(
+        1px solid rgba(255,
             255,
             255,
-            255,
-            .25
-        );
+            .25);
 
     background: #222;
 
     box-shadow:
-        0 10px 40px
-        rgba(
+        0 10px 40px rgba(0,
             0,
             0,
-            0,
-            .5
-        );
+            .5);
 }
 
 
@@ -150,12 +138,8 @@ body {
     position: absolute;
 
     top:
-        max(
-            20px,
-            env(
-                safe-area-inset-top
-            )
-        );
+        max(20px,
+            env(safe-area-inset-top));
 
     left: 20px;
 
@@ -166,12 +150,10 @@ body {
     border-radius: 20px;
 
     background:
-        rgba(
+        rgba(0,
             0,
             0,
-            0,
-            .5
-        );
+            .5);
 
     font-size: 12px;
 
@@ -196,12 +178,10 @@ body {
     border-radius: 20px;
 
     background:
-        rgba(
+        rgba(0,
             0,
             0,
-            0,
-            .5
-        );
+            .5);
 
     font-size: 13px;
 
@@ -215,12 +195,7 @@ body {
     left: 50%;
 
     bottom:
-        calc(
-            25px +
-            env(
-                safe-area-inset-bottom
-            )
-        );
+        calc(25px + env(safe-area-inset-bottom));
 
     transform:
         translateX(-50%);
@@ -234,20 +209,18 @@ body {
 
 
 .control-button {
-    width: 60px;
-    height: 60px;
+    width: 45px;
+    height: 45px;
 
     border: none;
 
     border-radius: 50%;
 
     background:
-        rgba(
+        rgba(255,
             255,
             255,
-            255,
-            .18
-        );
+            .25);
 
     color: white;
 
@@ -259,7 +232,6 @@ body {
         blur(12px);
 }
 
-
 .end-call {
     background: #ff3b30;
 }
@@ -270,12 +242,8 @@ body {
     .local-video {
 
         top:
-            max(
-                12px,
-                env(
-                    safe-area-inset-top
-                )
-            );
+            max(12px,
+                env(safe-area-inset-top));
 
         right: 12px;
 
@@ -290,12 +258,8 @@ body {
     .person-label {
 
         top:
-            max(
-                12px,
-                env(
-                    safe-area-inset-top
-                )
-            );
+            max(12px,
+                env(safe-area-inset-top));
 
         left: 12px;
 
@@ -305,12 +269,8 @@ body {
     .status {
 
         top:
-            max(
-                12px,
-                env(
-                    safe-area-inset-top
-                )
-            );
+            max(12px,
+                env(safe-area-inset-top));
 
         font-size: 11px;
 
@@ -319,8 +279,8 @@ body {
 
     .control-button {
 
-        width: 55px;
-        height: 55px;
+        width: 45px;
+        height: 45px;
 
     }
 
@@ -343,7 +303,7 @@ body {
 
     border-radius: 14px;
 
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.45);
 
     backdrop-filter: blur(12px);
 
@@ -365,4 +325,31 @@ body {
     line-height: 1.4;
 
     font-weight: 400;
+
+    opacity: 1;
+
+    transition:
+        opacity 0.4s ease;
+}
+
+.subtitle-text.subtitle-hidden {
+    opacity: 0;
+}
+
+/* ========================================
+   AUTO-HIDE VIDEO UI
+   ======================================== */
+body.ui-hidden .controls,
+body.ui-hidden #status,
+body.ui-hidden .person-label {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Smooth fade */
+.controls,
+#status,
+.person-label {
+    transition:
+        opacity 0.35s ease;
 }
